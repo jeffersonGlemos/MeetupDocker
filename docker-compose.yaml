@@ -1,0 +1,72 @@
+version: "3"
+services:
+#  iis:
+#    build:
+#      context: ./iis
+#    volumes:
+#      - ./app:/inetpub/wwwroot
+#    ports:
+#      - "82:80"
+#    environment:
+#      - POSTGRES_USER=postgres
+#      - POSTGRES_PASS=mortadela1
+  reverse-proxy:
+    image: traefik:v2.3
+    command: --api.insecure=true --providers.docker
+    labels:
+      - "traefik.http.routers.myroutertraefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.services.myroutertraefik.loadbalancer.server.port=8080"
+    ports:
+      - "80:80"
+      - "8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  apache:
+    hostname: apache.localhost
+    build:
+      context: ./apache
+    volumes:
+      - ./app:/var/www/html
+    ports:
+      - "82:80"
+    labels:
+      - "traefik.http.routers.myrouterapache.rule=Host(`apache.localhost`)"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=mortadela1
+  nginx:
+    image: nginx:1.13
+    volumes:
+      - "./app:/var/www/html"
+      - "./nginx/nginx.conf:/etc/nginx/nginx.conf"
+    labels:
+      - "traefik.http.routers.myrouternginx.rule=Host(`nginx.localhost`)"
+    ports:
+      - "81:80"
+    depends_on:
+      - php
+  php:
+    build:
+      context: ./php
+    volumes:
+      - "./app:/var/www/html"
+    ports:
+      - "9000:9000"
+    depends_on:
+      - postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=mortadela1
+  postgres:
+    image: postgres:latest
+    volumes:
+      - "db_data:/var/lib/postgresql/data"
+      - "./postgres/sql:/docker-entrypoint-initdb.d"
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mortadela1
+      POSTGRES_DB: blog
+volumes:
+  db_data:
